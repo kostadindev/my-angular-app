@@ -1,0 +1,25 @@
+{
+  "headers": {
+    "/*": {
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+      "X-Frame-Options": "DENY",
+      "X-Content-Type-Options": "nosniff",
+      "X-XSS-Protection": "1; mode=block"
+    },
+    "/assets/*": {
+      "Cache-Control": "public, max-age=31536000, immutable"
+    },
+    "/*.js": {
+      "Cache-Control": "public, max-age=31536000, immutable"
+    },
+    "/*.css": {
+      "Cache-Control": "public, max-age=31536000, immutable"
+    }
+  },
+  "https_only": true,
+  "root": "dist/my-angular-app/browser/",
+  "routes": {
+    "/**": "index.html"
+  },
+  "error_page": "index.html"
+}
