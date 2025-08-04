@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GridsterModule, GridsterConfig, GridsterItem } from 'angular-gridster2';
 import { NgxEchartsModule } from 'ngx-echarts';
+import { HighchartsChartComponent } from '../highcharts-chart/highcharts-chart.component';
+import { ChartjsChartComponent } from '../chartjs-chart/chartjs-chart.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, GridsterModule, NgxEchartsModule],
+  imports: [CommonModule, FormsModule, GridsterModule, NgxEchartsModule, HighchartsChartComponent, ChartjsChartComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -19,6 +21,7 @@ export class DashboardComponent implements OnInit {
   selectedTimeRange: string = 'last30days';
   selectedCategory: string = 'all';
   selectedRegion: string = 'all';
+  selectedChartLibrary: string = 'echarts';
   
   // Cached data to prevent jittering
   private cachedChartData: Map<string, any> = new Map();
@@ -44,6 +47,12 @@ export class DashboardComponent implements OnInit {
     { value: 'south', label: 'South' },
     { value: 'east', label: 'East' },
     { value: 'west', label: 'West' }
+  ];
+  
+  chartLibraries = [
+    { value: 'echarts', label: 'ECharts' },
+    { value: 'ng2-charts', label: 'Chart.js' },
+    { value: 'highcharts', label: 'Highcharts' }
   ];
 
   ngOnInit() {
@@ -149,15 +158,459 @@ export class DashboardComponent implements OnInit {
     this.onFilterChange();
   }
   
+  onChartLibraryChange() {
+    // Clear cache when switching libraries
+    this.cachedChartData.clear();
+    this.changedOptions();
+  }
+  
   // Get cached chart options to prevent continuous re-rendering
   getCachedChartOptions(type: string): any {
-    const cacheKey = `${type}-${this.selectedTimeRange}-${this.selectedCategory}-${this.selectedRegion}`;
+    const cacheKey = `${type}-${this.selectedTimeRange}-${this.selectedCategory}-${this.selectedRegion}-${this.selectedChartLibrary}`;
     
     if (!this.cachedChartData.has(cacheKey)) {
       this.cachedChartData.set(cacheKey, this.generateChartOptions(type));
     }
     
     return this.cachedChartData.get(cacheKey);
+  }
+  
+  // Methods for different chart libraries
+  getNgxChartData(type: string): any {
+    const baseOptions = this.generateChartOptions(type);
+    
+    switch(type) {
+      case 'bar':
+        // Convert series data to ngx-charts format
+        const barData: any[] = [];
+        const categories = baseOptions.xAxis?.data || [];
+        baseOptions.series?.forEach((series: any) => {
+          series.data?.forEach((value: number, index: number) => {
+            const existingCategory = barData.find(d => d.name === categories[index]);
+            if (existingCategory) {
+              existingCategory.series.push({ name: series.name, value: value });
+            } else {
+              barData.push({
+                name: categories[index],
+                series: [{ name: series.name, value: value }]
+              });
+            }
+          });
+        });
+        return barData;
+        
+      case 'pie':
+        // Convert pie data to ngx-charts format
+        return baseOptions.series?.[0]?.data?.map((item: any) => ({
+          name: item.name,
+          value: item.value
+        })) || [];
+        
+      case 'line':
+        // Convert line data to ngx-charts format
+        return baseOptions.series?.map((series: any) => ({
+          name: series.name,
+          series: series.data?.map((value: number, index: number) => ({
+            name: baseOptions.xAxis?.data?.[index] || index,
+            value: value
+          })) || []
+        })) || [];
+        
+      case 'scatter':
+        // Convert scatter data to ngx-charts bubble format
+        return baseOptions.series?.map((series: any) => ({
+          name: series.name,
+          series: series.data?.map((point: number[]) => ({
+            x: point[0],
+            y: point[1],
+            r: 5, // Fixed radius for bubbles
+            name: `${series.name}: (${point[0].toFixed(1)}, ${point[1].toFixed(1)})`
+          })) || []
+        })) || [];
+        
+      case 'heatmap':
+        // Convert heatmap data to ngx-charts format
+        const heatmapData: any[] = [];
+        const hours = baseOptions.xAxis?.data || [];
+        const days = baseOptions.yAxis?.data || [];
+        baseOptions.series?.[0]?.data?.forEach((item: number[]) => {
+          const hourIndex = item[0];
+          const dayIndex = item[1];
+          const value = item[2];
+          heatmapData.push({
+            name: days[dayIndex] || `Day ${dayIndex}`,
+            series: [{
+              name: hours[hourIndex] || `Hour ${hourIndex}`,
+              value: value
+            }]
+          });
+        });
+        return heatmapData;
+        
+      default:
+        return [];
+    }
+  }
+  
+  getChartJsData(type: string): any {
+    // Use cached data for Chart.js to prevent constant updates
+    const cacheKey = `chartjs-${type}-${this.selectedTimeRange}-${this.selectedCategory}-${this.selectedRegion}`;
+    
+    if (this.cachedChartData.has(cacheKey)) {
+      return this.cachedChartData.get(cacheKey);
+    }
+    
+    const baseOptions = this.generateChartOptions(type);
+    let chartData: any;
+    
+    switch(type) {
+      case 'bar':
+        chartData = {
+          labels: baseOptions.xAxis?.data || [],
+          datasets: baseOptions.series?.map((series: any, index: number) => ({
+            label: series.name,
+            data: series.data,
+            backgroundColor: ['#5470c6', '#91cc75', '#fac858'][index] || '#5470c6',
+            borderColor: ['#5470c6', '#91cc75', '#fac858'][index] || '#5470c6',
+            borderWidth: 1
+          })) || []
+        };
+        break;
+        
+      case 'pie':
+        const pieData = baseOptions.series?.[0]?.data || [];
+        chartData = {
+          labels: pieData.map((item: any) => item.name),
+          datasets: [{
+            data: pieData.map((item: any) => item.value),
+            backgroundColor: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'],
+            borderWidth: 1
+          }]
+        };
+        break;
+        
+      case 'line':
+        chartData = {
+          labels: baseOptions.xAxis?.data || [],
+          datasets: baseOptions.series?.map((series: any, index: number) => ({
+            label: series.name,
+            data: series.data,
+            borderColor: ['#5470c6', '#ee6666', '#91cc75'][index] || '#5470c6',
+            backgroundColor: ['rgba(84, 112, 198, 0.2)', 'rgba(238, 102, 102, 0.2)', 'rgba(145, 204, 117, 0.2)'][index] || 'rgba(84, 112, 198, 0.2)',
+            tension: 0.4,
+            fill: true
+          })) || []
+        };
+        break;
+        
+      case 'scatter':
+        chartData = {
+          datasets: baseOptions.series?.map((series: any, index: number) => ({
+            label: series.name,
+            data: series.data?.map((point: number[]) => ({ x: point[0], y: point[1] })),
+            backgroundColor: ['#5470c6', '#91cc75', '#fac858'][index] || '#5470c6',
+            pointRadius: 5
+          })) || []
+        };
+        break;
+        
+      case 'heatmap':
+        // Chart.js doesn't support heatmap natively, convert to bar chart
+        chartData = {
+          labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+          datasets: [{
+            label: 'Activity Level',
+            data: Array.from({length: 24}, () => Math.floor(Math.random() * 50)),
+            backgroundColor: '#5470c6'
+          }]
+        };
+        break;
+        
+      default:
+        chartData = { labels: [], datasets: [] };
+    }
+    
+    this.cachedChartData.set(cacheKey, chartData);
+    return chartData;
+  }
+  
+  getHighchartsOptions(type: string): any {
+    // Use cached data for Highcharts to prevent constant updates
+    const cacheKey = `highcharts-${type}-${this.selectedTimeRange}-${this.selectedCategory}-${this.selectedRegion}`;
+    
+    if (this.cachedChartData.has(cacheKey)) {
+      return this.cachedChartData.get(cacheKey);
+    }
+    
+    const baseOptions = this.generateChartOptions(type);
+    const isDark = document.documentElement.classList.contains('dark-theme');
+    const textColor = isDark ? '#e0e0e0' : '#333';
+    
+    // Common options for all charts
+    const commonOptions = {
+      credits: { enabled: false },
+      chart: {
+        backgroundColor: 'transparent',
+        style: {
+          fontFamily: 'inherit'
+        }
+      },
+      title: {
+        style: { color: textColor }
+      },
+      legend: {
+        itemStyle: { color: textColor }
+      },
+      tooltip: {
+        backgroundColor: isDark ? '#2a2a2a' : '#ffffff',
+        style: { color: isDark ? '#e0e0e0' : '#333' }
+      }
+    };
+    
+    // Convert ECharts options to Highcharts format
+    let chartOptions: any;
+    
+    switch(type) {
+      case 'bar':
+        chartOptions = {
+          ...commonOptions,
+          chart: { 
+            ...commonOptions.chart,
+            type: 'column' 
+          },
+          title: { 
+            text: 'Sales by Region',
+            style: commonOptions.title.style
+          },
+          xAxis: {
+            categories: baseOptions.xAxis?.data || [],
+            title: { 
+              text: baseOptions.xAxis?.name || '',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          yAxis: {
+            title: { 
+              text: baseOptions.yAxis?.name || 'Value',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          plotOptions: {
+            column: {
+              borderRadius: 3,
+              dataLabels: {
+                enabled: false
+              }
+            }
+          },
+          series: baseOptions.series?.map((s: any) => ({
+            name: s.name,
+            data: s.data,
+            type: 'column'
+          })) || []
+        };
+        break;
+      
+      case 'pie':
+        chartOptions = {
+          ...commonOptions,
+          chart: { 
+            ...commonOptions.chart,
+            type: 'pie' 
+          },
+          title: { 
+            text: 'Market Share',
+            style: commonOptions.title.style
+          },
+          plotOptions: {
+            pie: {
+              allowPointSelect: true,
+              cursor: 'pointer',
+              dataLabels: {
+                enabled: true,
+                format: '<b>{point.name}</b>: {point.percentage:.1f} %',
+                style: { color: textColor }
+              },
+              showInLegend: true
+            }
+          },
+          series: [{
+            name: baseOptions.series?.[0]?.name || 'Share',
+            type: 'pie',
+            data: baseOptions.series?.[0]?.data?.map((item: any) => ({
+              name: item.name,
+              y: item.value
+            })) || []
+          }]
+        };
+        break;
+        
+      case 'line':
+        chartOptions = {
+          ...commonOptions,
+          chart: { 
+            ...commonOptions.chart,
+            type: 'line' 
+          },
+          title: { 
+            text: 'Revenue Trend',
+            style: commonOptions.title.style
+          },
+          xAxis: {
+            categories: baseOptions.xAxis?.data || [],
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          yAxis: {
+            title: { 
+              text: 'Value',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          plotOptions: {
+            line: {
+              dataLabels: {
+                enabled: false
+              },
+              marker: {
+                enabled: true,
+                radius: 4
+              }
+            }
+          },
+          series: baseOptions.series?.map((s: any) => ({
+            name: s.name,
+            data: s.data,
+            type: 'line'
+          })) || []
+        };
+        break;
+        
+      case 'scatter':
+        chartOptions = {
+          ...commonOptions,
+          chart: { 
+            ...commonOptions.chart,
+            type: 'scatter',
+            zoomType: 'xy'
+          },
+          title: { 
+            text: 'Price vs Performance',
+            style: commonOptions.title.style
+          },
+          xAxis: {
+            title: { 
+              text: 'Price',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            },
+            startOnTick: true,
+            endOnTick: true,
+            showLastLabel: true
+          },
+          yAxis: {
+            title: { 
+              text: 'Performance',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          plotOptions: {
+            scatter: {
+              marker: {
+                radius: 5,
+                states: {
+                  hover: {
+                    enabled: true,
+                    lineColor: 'rgb(100,100,100)'
+                  }
+                }
+              },
+              tooltip: {
+                headerFormat: '<b>{series.name}</b><br>',
+                pointFormat: 'Price: {point.x}, Performance: {point.y}'
+              }
+            }
+          },
+          series: baseOptions.series?.map((s: any) => ({
+            name: s.name,
+            data: s.data,
+            type: 'scatter'
+          })) || []
+        };
+        break;
+        
+      case 'heatmap':
+        // For heatmap, we'll use a simple column chart as Highcharts heatmap requires additional module
+        const hours = baseOptions.xAxis?.data || [];
+        chartOptions = {
+          ...commonOptions,
+          chart: { 
+            ...commonOptions.chart,
+            type: 'column' 
+          },
+          title: { 
+            text: 'Activity Heatmap',
+            style: commonOptions.title.style
+          },
+          xAxis: {
+            categories: hours.slice(0, 24),
+            title: {
+              text: 'Hour of Day',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          yAxis: {
+            title: { 
+              text: 'Activity Level',
+              style: { color: textColor }
+            },
+            labels: {
+              style: { color: textColor }
+            }
+          },
+          plotOptions: {
+            column: {
+              colorByPoint: true,
+              dataLabels: {
+                enabled: false
+              }
+            }
+          },
+          series: [{
+            name: 'Activity',
+            data: Array.from({length: 24}, () => Math.floor(Math.random() * 50)),
+            type: 'column'
+          }]
+        };
+        break;
+        
+      default:
+        chartOptions = { 
+          ...commonOptions,
+          series: [] 
+        };
+    }
+    
+    this.cachedChartData.set(cacheKey, chartOptions);
+    return chartOptions;
   }
 
   // Helper method to generate data based on filters with stable seed
