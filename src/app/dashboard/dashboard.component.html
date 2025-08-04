@@ -1,0 +1,18 @@
+<div class="dashboard-container">
+  <gridster [options]="options" class="dashboard-grid">
+    <gridster-item [item]="item" *ngFor="let item of dashboard" class="chart-container">
+      <div class="chart-header">
+        <h3>{{ getChartTitle(item['type']) }}</h3>
+        <button class="remove-button" (click)="removeItem(item)" title="Remove chart">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="chart-content">
+        <div echarts [options]="getChartOptions(item['type'])" class="chart"></div>
+      </div>
+    </gridster-item>
+  </gridster>
+</div>
