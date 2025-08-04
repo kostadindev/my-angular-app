@@ -1,4 +1,29 @@
 <div class="dashboard-container">
+  <div class="filters-container">
+    <div class="filter-group">
+      <label>Time Range:</label>
+      <select [(ngModel)]="selectedTimeRange" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let range of timeRanges" [value]="range.value">{{ range.label }}</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label>Category:</label>
+      <select [(ngModel)]="selectedCategory" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let category of categories" [value]="category.value">{{ category.label }}</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label>Region:</label>
+      <select [(ngModel)]="selectedRegion" (change)="onFilterChange()" class="filter-select">
+        <option *ngFor="let region of regions" [value]="region.value">{{ region.label }}</option>
+      </select>
+    </div>
+    
+    <button class="reset-button" (click)="resetFilters()">Reset Filters</button>
+  </div>
+  
   <gridster [options]="options" class="dashboard-grid">
     <gridster-item [item]="item" *ngFor="let item of dashboard" class="chart-container">
       <div class="chart-header">
@@ -11,7 +36,10 @@
         </button>
       </div>
       <div class="chart-content">
-        <div echarts [options]="getChartOptions(item['type'])" class="chart"></div>
+        <div echarts 
+             [options]="getChartOptions(item['type'])" 
+             (chartClick)="onChartClick($event, item['type'])"
+             class="chart"></div>
       </div>
     </gridster-item>
   </gridster>
