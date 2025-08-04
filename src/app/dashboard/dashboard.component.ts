@@ -353,13 +353,17 @@ export class DashboardComponent implements OnInit {
         backgroundColor: 'transparent',
         style: {
           fontFamily: 'inherit'
-        }
+        },
+        spacing: [10, 10, 15, 10], // top, right, bottom, left
+        reflow: true
       },
       title: {
-        style: { color: textColor }
+        style: { color: textColor },
+        margin: 15
       },
       legend: {
-        itemStyle: { color: textColor }
+        itemStyle: { color: textColor },
+        margin: 10
       },
       tooltip: {
         backgroundColor: isDark ? '#2a2a2a' : '#ffffff',

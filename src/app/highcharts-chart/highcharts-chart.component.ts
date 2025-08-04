@@ -23,10 +23,23 @@ export class HighchartsChartComponent implements OnInit, OnChanges {
   chartOptions: Highcharts.Options = {};
   updateFlag = false;
   chartCallback: Highcharts.ChartCallbackFunction = (chart) => {
-    // Store chart instance for later use if needed
+    // Force reflow after initialization to ensure proper sizing
     setTimeout(() => {
-      chart.reflow();
-    }, 0);
+      if (chart && typeof chart.reflow === 'function') {
+        chart.reflow();
+      }
+    }, 100);
+    
+    // Also reflow on window resize
+    const resizeHandler = () => {
+      if (chart && typeof chart.reflow === 'function') {
+        chart.reflow();
+      }
+    };
+    window.addEventListener('resize', resizeHandler);
+    
+    // Store the handler for cleanup
+    (chart as any).resizeHandler = resizeHandler;
   };
 
   ngOnInit(): void {
@@ -49,6 +62,13 @@ export class HighchartsChartComponent implements OnInit, OnChanges {
   private initializeChart(): void {
     // Deep clone the options to avoid mutation issues
     this.chartOptions = JSON.parse(JSON.stringify(this.options));
+    
+    // Force chart to use full container size
+    if (!this.chartOptions.chart) {
+      this.chartOptions.chart = {};
+    }
+    this.chartOptions.chart.width = null;
+    this.chartOptions.chart.height = null;
     
     // Ensure responsive behavior
     if (!this.chartOptions.responsive) {
